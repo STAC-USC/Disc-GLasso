@@ -1,12 +1,19 @@
-% Construct the graph for each class
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% This is the script to compare our proposed discriminative graphical 
+%%% lasso algorithm (Disc-GLasso) with other graph learning algorithm (e.g. 
+%%% GLasso) on synthetic data.
+%%%
+%%% Author: Jiun-Yu Kao 
+%%% July 22,2016
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-addpath('../Util/graph_tools/');
-
-% every signal is an 8x8 patch
+% Construct the graph for each class following 8x8 grid patch
+addpath('Util/graph_tools/');
 Dx = 8; 
 Dy = 8;
 [edges,N,coords] = lattice3(Dx,Dy,1);
-% specify the edge weights of each direction of each graph
+
+% Specify the edge weights of each direction on each graph
 w1x = 0.9; w1y = 0.9;
 w2x = 0.9; w2y = 0.1;
 
@@ -29,17 +36,17 @@ for m=(size(edges,1)/2)+1 : size(edges,1) % edges in the X-direction
    W2(edges(m,2),edges(m,1)) = w2x;
 end
 
-% compute the Laplacian matrices for each graph
+% Compute the Laplacian matrix for each graph
 D1 = diag(sum(W1,2));
 D2 = diag(sum(W2,2));
 L1 = D1-W1;
 L2 = D2-W2;
 sigma = 1.0;
-K1 = inv(sigma*eye(N)+L1); % inverse precision matrix based on G1
-K2 = inv(sigma*eye(N)+L2); % inverse precision matrix based on G2
+K1 = inv(sigma*eye(N)+L1); % covariance matrix based on G1
+K2 = inv(sigma*eye(N)+L2); % covariance matrix based on G2
 
-% Generate the iid Gaussian signals based on each precision matrix
-addpath('../Util/');
+% Generate the iid Gaussian signals based on each covariance matrix
+addpath('Util/');
 nSamples = 2000;
 Sig1 = mvnrnd(zeros(1,N), K1, nSamples);
 Sig2 = mvnrnd(zeros(1,N), K2, nSamples);
@@ -50,16 +57,17 @@ S2 = cov(Sig2);
 S_all = cell(1,2);
 S_all{1,1} = S1;
 S_all{1,2} = S2;
-% test discriminative graphical lasso algorithm on estimating the precision
-% matrices for each class of signals
-rho = 0.05;
 
-% code for examinging the impact of using different ratio 
+rho = 0.05;
+% Generate the test signals based on the same distribution as training
+% signals
 testSig1 = mvnrnd(zeros(1,N), K1, nSamples);
 testSig2 = mvnrnd(zeros(1,N), K2, nSamples);
 testS1 = cov(testSig1);
 testS2 = cov(testSig2);
-valRatio = 5:5:100;
+
+% Examine the impact of using different weight for regularizer
+valRatio = 10:5:100;
 result_ratio_glasso = zeros(1,length(valRatio));
 result_ratio_disc = zeros(1,length(valRatio));
 result_accu_disc = zeros(1,length(valRatio));
@@ -67,15 +75,16 @@ result_accu_glasso = zeros(1,length(valRatio));
 
 for ratioIdx=1:length(valRatio)
 
+% Test discriminative graphical lasso algorithm on estimating the precision
+% matrices for each class of signals
 [Theta_all W_all bestRatio] = discriGLasso(S_all, rho, 1e2, 1e-6, valRatio(ratioIdx));
-% also use traditional graphical lasso (respectively for each category) for comparison
+
+% Also apply traditional graphical lasso (independently for each category) as comparison
 Theta_glasso = cell(1,2);
 W_glasso = cell(1,2);
 for cIdx=1:2
    [Theta_glasso{1,cIdx} W_glasso{1,cIdx}] = graphicalLasso(S_all{1,cIdx}, rho);
 end
-
-% save(sprintf('tempdata/Theta_for_r_%d', ratioIdx), 'Theta_all', 'Theta_glasso', 'W_all', 'W_glasso');
 
 % separation measure calculation
 result_ratio_disc(ratioIdx) = (trace(testS1*Theta_all{1,2})+trace(testS2*Theta_all{1,1})) / (trace(testS1*Theta_all{1,1})+trace(testS2*Theta_all{1,2}));
@@ -87,7 +96,7 @@ result_ratio_glasso(ratioIdx) = (trace(testS1*Theta_glasso{1,2})+trace(testS2*Th
 [V1_glasso, D] = eig(Theta_glasso{1,1});
 [V2_glasso, D] = eig(Theta_glasso{1,2});
 numBasis = floor(size(V1_disc,2)/2);
-% 
+
 testSig = [testSig1 ; testSig2];
 testLabel = [ones(size(testSig1,1),1) ; ones(size(testSig2,1),1)*2];
 
@@ -121,5 +130,19 @@ result_accu_glasso(ratioIdx) = test_accuracy_glasso;
 
 end
 
-% save('tempdata/separation_results', 'result_ratio_disc', 'result_ratio_glasso');
-% save('tempdata/classification_results', 'result_accu_disc', 'result_accu_glasso');
+% Plot the results
+figure;
+plot(valRatio(1:end),result_ratio_disc(1:end),'r-', 'Linewidth', 2.5);
+hold on
+plot(valRatio(1:end),result_ratio_glasso(1:end),'b--', 'Linewidth', 2.5);
+ylim([1.103 1.14]);
+xlabel('r');
+ylabel('separation measure s');
+legend('Disc-GLasso','GLasso');
+figure;
+plot(valRatio(1:end),result_accu_disc(1:end),'r-', 'Linewidth', 2.5);
+hold on
+plot(valRatio(1:end),result_accu_glasso(1:end),'b--', 'Linewidth', 2.5);
+xlabel('r');
+ylabel('classification accuracy');
+legend('Disc-GLasso','GLasso');
