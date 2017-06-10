@@ -1,27 +1,30 @@
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%% Discriminative Graphical Lasso function
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Discriminative Graphical Lasso main function
+%%%
 %%% Author: Jiun-Yu Kao 
 %%% July 22,2016
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 function [Theta_all W_all bestRatio] = discriGLasso(S_all, rho, maxIt, tol, bestRatio)
 
-% Solve for the discriminative graphical lasso for a few categories of
-% signals
+%%% Solve for the discriminative graphical lasso for a few categories of signals
+%
 % For each i in C,
 % minimize_{Theta_i > 0} -logdet(Theta_i) + tr(S_i*Theta_i) - 1/C sum_{j~=i}^C tr(S_j*Theta_i) + rho*||Theta||_1
 
-% Input:
+%%% Input:
 % S_all : an array for C sample covariance matrices, C is the number of categories 
 %     {S_1, ..., S_C}
 % rho : regularization parameter
 % maxIt : maximum number of iterations
 % tol : convergence tolerance level
+% bestRatio : parameter r defined in the paper as weight of regularizer 
+%             (If not specified, line search will be performed to get the minimum ratio r satisfying initial condition.)
 %
-% Output:
+%%% Output:
 % Theta_all : an array for inverse covariance matrices estimate, {Theta_1, ..., Theta_C}
-% W_all : an array regularized covariance matrices estimate, W = Theta^-1
-%     {W_1, ... W_C} and W_i = Theta_i^-1
+% W_all : an array for regularized covariance matrices estimate, {W_1, ... W_C}, where W_i = Theta_i^-1
+
 
 C = size(S_all,2);      % number of categories
 p = size(S_all{1,1},1); % number of variables 
@@ -37,7 +40,8 @@ sumAllCovMat = zeros(p,p);
 for cIdx = 1:C
    sumAllCovMat = sumAllCovMat + S_all{1,cIdx};
 end
-% searching for the minimum ratio r that makes (Si-sum{Sj}/r) still positive
+
+% Line searching for the minimum ratio r that makes (Si-sum{Sj}/r) still positive
 % semi-definite
 if nargin < 5
    valRatio = 1:0.1:5;
@@ -56,7 +60,6 @@ if nargin < 5
    end
 end
    
-
 for cIdx = 1:C
    S = S_all{1,cIdx};
    % Calculate the critical ratio from the max eigenvalues of S and sumOtherCov 
